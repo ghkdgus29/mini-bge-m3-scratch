@@ -31,7 +31,6 @@ BGE-M3(논문 *M3-Embedding*, [arXiv 2402.03216](https://arxiv.org/abs/2402.0321
 | [main.py](main.py) | 전체 파이프라인 (단계별 학습, 평가) |
 | [m3.py](m3.py) | 모델(세 헤드), 점수 함수, 손실, RetroMAE, split-batch |
 | [data.py](data.py) | 데이터 준비 (위키, SQuAD, smoke용 가짜 데이터, 합성 데이터 함수) |
-| [toy.py](toy.py) | 랜덤 숫자 데이터로 구조만 보는 단독 실행 버전 (다운로드 불필요) |
 | [SETUP.md](SETUP.md) | 모델과 데이터를 직접 받아서 넣는 방법 |
 | [DIFFERENCES.md](DIFFERENCES.md) | 논문, 공식 구현(FlagEmbedding)과 이 프로젝트의 차이 |
 
@@ -40,7 +39,6 @@ BGE-M3(논문 *M3-Embedding*, [arXiv 2402.03216](https://arxiv.org/abs/2402.0321
 ```bash
 uv sync                  # 의존성 설치
 
-uv run toy.py            # 가장 간단한 구조 확인 (몇 초~수 분)
 uv run main.py --smoke   # 빠른 동작 확인: 작은 가짜 영어 문서 + 작은 모델로 전체 단계를 1~2분에 돌려 봄
 uv run main.py           # 실제 데이터 전체 (CPU에서 약 1시간 반 예상)
 ```

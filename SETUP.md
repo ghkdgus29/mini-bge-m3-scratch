@@ -48,7 +48,7 @@
 
 ```
 bge-m3-scratch/
-├── main.py  m3.py  data.py  toy.py
+├── main.py  m3.py  data.py
 ├── models/
 │   └── xlm-roberta-base/
 │       ├── config.json

@@ -38,18 +38,6 @@
       "windows": { "python": "${workspaceFolder}/.venv/Scripts/python.exe" },
       "osx": { "python": "${workspaceFolder}/.venv/bin/python" },
       "linux": { "python": "${workspaceFolder}/.venv/bin/python" }
-    },
-    {
-      "name": "toy.py (랜덤 숫자 데이터)",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/toy.py",
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "justMyCode": true,
-      "windows": { "python": "${workspaceFolder}/.venv/Scripts/python.exe" },
-      "osx": { "python": "${workspaceFolder}/.venv/bin/python" },
-      "linux": { "python": "${workspaceFolder}/.venv/bin/python" }
     }
   ]
 }
