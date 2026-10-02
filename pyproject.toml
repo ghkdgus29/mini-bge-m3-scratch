@@ -1,0 +1,10 @@
+[project]
+name = "bge-m3-scratch"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.3",
+    "pyarrow>=25.0.1",
+    "torch>=2.14.1",
+    "transformers>=5.18.0",
+]

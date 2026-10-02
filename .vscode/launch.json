@@ -1,0 +1,55 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "main.py --smoke (빠른 동작 확인)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--smoke"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "windows": { "python": "${workspaceFolder}/.venv/Scripts/python.exe" },
+      "osx": { "python": "${workspaceFolder}/.venv/bin/python" },
+      "linux": { "python": "${workspaceFolder}/.venv/bin/python" }
+    },
+    {
+      "name": "main.py (실제 데이터)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "windows": { "python": "${workspaceFolder}/.venv/Scripts/python.exe" },
+      "osx": { "python": "${workspaceFolder}/.venv/bin/python" },
+      "linux": { "python": "${workspaceFolder}/.venv/bin/python" }
+    },
+    {
+      "name": "main.py --smoke --no-skd",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--smoke", "--no-skd"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "windows": { "python": "${workspaceFolder}/.venv/Scripts/python.exe" },
+      "osx": { "python": "${workspaceFolder}/.venv/bin/python" },
+      "linux": { "python": "${workspaceFolder}/.venv/bin/python" }
+    },
+    {
+      "name": "toy.py (랜덤 숫자 데이터)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/toy.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "windows": { "python": "${workspaceFolder}/.venv/Scripts/python.exe" },
+      "osx": { "python": "${workspaceFolder}/.venv/bin/python" },
+      "linux": { "python": "${workspaceFolder}/.venv/bin/python" }
+    }
+  ]
+}
