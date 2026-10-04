@@ -1,4 +1,4 @@
-"""데이터 준비: 사람이 읽을 수 있는 실제 텍스트 (영어 Wikipedia + SQuAD), 그리고 빠른 동작 확인용 smoke 데이터
+"""데이터 준비: 사람이 읽을 수 있는 실제 텍스트 (영어 Wikipedia + SQuAD)
 
 반환 형식은 모두 같다.
   wiki : [(제목, 본문 문단), ...]   라벨 없는 대량 텍스트에서 자동 추출한 쌍 -> Stage 0, 1
@@ -11,7 +11,7 @@ import random
 from pathlib import Path
 
 CACHE = Path(__file__).parent / "data"  # 원본에서 추려 낸 결과를 저장해 두는 곳 (두 번째 실행부터는 이 파일만 읽는다)
-RAW = CACHE / "raw"  # 직접 받아 둔 원본 파일 위치 (SETUP.md 참고)
+RAW = CACHE / "raw"  # 미리 받아 둔 로컬 원본 파일 위치 (있으면 HuggingFace 다운로드 대신 사용)
 LOCAL_WIKI = RAW / "wikipedia" / "train-00000-of-00041.parquet"
 
 
@@ -44,16 +44,20 @@ def one_per_context(rows, n, rng):
     return out[:n]
 
 
-def _need(path):
-    if not path.exists():
-        raise FileNotFoundError(f"{path} 가 없습니다. SETUP.md 를 보고 파일을 받아 이 위치에 넣어 주세요.")
-    return path
+def _hf_download(repo_id, filename, repo_type="dataset"):
+    """HuggingFace Hub 에서 파일을 내려받아 캐시 경로를 반환한다. 이미 캐시되어 있으면 바로 반환."""
+    from huggingface_hub import hf_hub_download
+    print(f"  HuggingFace 에서 받는 중: {repo_id}/{filename} (첫 실행 시에만)")
+    return hf_hub_download(repo_id=repo_id, filename=filename, repo_type=repo_type)
 
 
 def _wiki_batches():
     import pyarrow.parquet as pq
 
-    pf = pq.ParquetFile(_need(LOCAL_WIKI))  # 파일이 커서 한 번에 다 읽지 않고 앞에서부터 조금씩 읽는다
+    path = LOCAL_WIKI if LOCAL_WIKI.exists() else _hf_download(
+        "wikimedia/wikipedia", "20231101.en/train-00000-of-00041.parquet"
+    )
+    pf = pq.ParquetFile(path)  # 파일이 커서 한 번에 다 읽지 않고 앞에서부터 조금씩 읽는다
     for b in pf.iter_batches(batch_size=200, columns=["title", "text"]):
         yield b["title"].to_pylist(), b["text"].to_pylist()
 
@@ -61,7 +65,10 @@ def _wiki_batches():
 def _squad_rows(split):
     import pyarrow.parquet as pq
 
-    path = _need(RAW / "squad" / f"{split}-00000-of-00001.parquet")
+    local = RAW / "squad" / f"{split}-00000-of-00001.parquet"
+    path = local if local.exists() else _hf_download(
+        "rajpurkar/squad", f"plain_text/{split}-00000-of-00001.parquet"
+    )
     return pq.read_table(path, columns=["title", "context", "question"]).to_pylist()
 
 
@@ -80,31 +87,6 @@ def real_data(n_wiki, n_lab, n_test, seed=0):
     CACHE.mkdir(exist_ok=True)
     cache.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     return data
-
-
-# ============ smoke 데이터 (빠른 동작 확인용: 작고 가짜지만 전체 단계를 1~2분에 돌릴 수 있다) ============
-def smoke_data(seed=0):
-    """가상의 마을 설명 문서를 템플릿으로 만든다. 사람이 읽을 수는 있지만 내용은 가짜다."""
-    rng = random.Random(seed)
-    syl = ["al", "bro", "cor", "den", "el", "fen", "gar", "hol", "ir", "jun", "kel", "lor", "mar", "nor", "os", "pel"]
-    names = list({(rng.choice(syl) + rng.choice(syl) + rng.choice(syl)).capitalize() for _ in range(400)})[:180]
-    rivers = ["Aren", "Belo", "Cinder", "Dova", "Esk", "Fyrn", "Gale", "Hush"]
-    goods = ["wool", "salt", "apple", "copper", "timber", "honey", "pottery", "silk"]
-    towns = []
-    for name in names:
-        river, good, year = rng.choice(rivers), rng.choice(goods), rng.randint(1100, 1900)
-        para = (
-            f"{name} is a small town in the northern part of the country. It was founded in {year} on the banks of the "
-            f"{river} river. For centuries the town has been famous for its {good} market, which attracts merchants from "
-            f"nearby villages every spring. The old stone bridge of {name} is a popular place for visitors."
-        )
-        towns.append((name, para, f"Which river runs through {name}?", f"When was {name} founded?", f"What is {name} famous for?"))
-    pair = lambda t, k: (t[k], t[1])
-    return {
-        "wiki": [(t[0], t[1]) for t in towns[:120]],
-        "lab": [pair(t, rng.choice([2, 3, 4])) for t in towns[120:150]],
-        "test": [pair(t, rng.choice([2, 3, 4])) for t in towns[150:180]],
-    }
 
 
 # ============ 합성 데이터 (논문 §3.1 / 부록 A.2) -- 이 프로젝트에서는 실행하지 않음 ============

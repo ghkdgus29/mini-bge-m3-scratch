@@ -30,7 +30,7 @@ BGE-M3(논문 *M3-Embedding*, [arXiv 2402.03216](https://arxiv.org/abs/2402.0321
 |---|---|
 | [main.py](main.py) | 전체 파이프라인 (단계별 학습, 평가) |
 | [m3.py](m3.py) | 모델(세 헤드), 점수 함수, 손실, RetroMAE, split-batch |
-| [data.py](data.py) | 데이터 준비 (위키, SQuAD, smoke용 가짜 데이터, 합성 데이터 함수) |
+| [data.py](data.py) | 데이터 준비 (위키, SQuAD, 합성 데이터 함수) |
 | [SETUP.md](SETUP.md) | 모델과 데이터를 직접 받아서 넣는 방법 |
 | [DIFFERENCES.md](DIFFERENCES.md) | 논문, 공식 구현(FlagEmbedding)과 이 프로젝트의 차이 |
 
@@ -39,7 +39,6 @@ BGE-M3(논문 *M3-Embedding*, [arXiv 2402.03216](https://arxiv.org/abs/2402.0321
 ```bash
 uv sync                  # 의존성 설치
 
-uv run main.py --smoke   # 빠른 동작 확인: 작은 가짜 영어 문서 + 작은 모델로 전체 단계를 1~2분에 돌려 봄
 uv run main.py           # 실제 데이터 전체 (CPU에서 약 1시간 반 예상)
 ```
 
@@ -52,4 +51,4 @@ Windows와 Mac 모두 같은 명령으로 동작합니다. VS Code에서는 F5�
 ## 주의
 
 - 데이터가 논문의 수십만~수천만 분의 일이라, 나오는 수치는 논문과 비교할 수 없습니다. 각 단계가 어떻게 이어지고 손실이 어떻게 작동하는지 보는 용도입니다.
-- 실제 데이터 전체 실행은 공식 구현에 맞춰 고친 뒤로는 아직 하지 않았습니다 (`--smoke`와 일부 구성요소만 확인). 자세한 상태는 [DIFFERENCES.md](DIFFERENCES.md)를 보세요.
+- 실제 데이터 전체 실행은 공식 구현에 맞춰 고친 뒤로는 아직 하지 않았습니다 (일부 구성요소만 확인). 자세한 상태는 [DIFFERENCES.md](DIFFERENCES.md)를 보세요.

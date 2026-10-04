@@ -10,9 +10,8 @@
   (합성 데이터 단계는 data.synthesize_questions 에 설명과 함께 구현만 해 두고 실행하지 않는다)
 
 실행
-  uv run main.py --smoke   빠른 동작 확인: 작은 가짜 영어 문서 + 작은 모델로 전체 단계를 1~2분에 돌려 봄 (모델/데이터 파일 불필요)
-  uv run main.py           실제 데이터. models/ 와 data/raw/ 에 파일이 있어야 한다 (SETUP.md). 인터넷은 쓰지 않는다
-  옵션: --no-skd (논문 표 5 ablation)  --device cpu|cuda|mps  --steps S0 S1 S2a S2b  --model 폴더
+  uv run main.py           실제 데이터. 모델과 데이터셋은 첫 실행 때 HuggingFace 에서 자동으로 받는다
+  옵션: --no-skd (논문 표 5 ablation)  --device cpu|cuda|mps  --steps S0 S1 S2a S2b  --model 모델ID또는폴더
 """
 
 import argparse
@@ -27,7 +26,7 @@ os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")  # Mac(MPS)에서 지�
 
 import torch  # noqa: E402
 
-from data import real_data, smoke_data  # noqa: E402
+from data import real_data  # noqa: E402
 from m3 import M3, W, embed, loss_plain, loss_skd, nce, retromae_loss, scores  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -51,7 +50,7 @@ def pick_device(name):
 
 
 # ============ 모델 / 토크나이저 ============
-def build(a, data):
+def build(a):
     from transformers import AutoModelForMaskedLM, AutoTokenizer
     from transformers import logging as hf_logging
 
@@ -60,27 +59,8 @@ def build(a, data):
     def split(mlm):  # MLM 모델 -> (인코더, MLM 출력층). 인코더는 이후 M3 의 공유 인코더가 되고, 출력층은 Stage 0 에서만 쓴다
         return mlm.base_model, (mlm.lm_head if hasattr(mlm, "lm_head") else mlm.cls)
 
-    if a.smoke:  # 작은 WordPiece 토크나이저를 즉석에서 학습하고, 작은 BERT 를 무작위 초기화
-        from tokenizers import Tokenizer, models, normalizers, pre_tokenizers, processors, trainers
-        from transformers import BertConfig, BertForMaskedLM, PreTrainedTokenizerFast
-
-        texts = [t for k in data for pair in data[k] for t in pair]
-        tk = Tokenizer(models.WordPiece(unk_token="[UNK]"))
-        tk.normalizer, tk.pre_tokenizer = normalizers.BertNormalizer(lowercase=True), pre_tokenizers.BertPreTokenizer()
-        sp = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"]
-        tk.train_from_iterator(texts, trainers.WordPieceTrainer(vocab_size=800, special_tokens=sp))
-        tk.post_processor = processors.TemplateProcessing(
-            single="[CLS] $A [SEP]", special_tokens=[("[CLS]", tk.token_to_id("[CLS]")), ("[SEP]", tk.token_to_id("[SEP]"))]
-        )
-        tok = PreTrainedTokenizerFast(
-            tokenizer_object=tk, unk_token="[UNK]", pad_token="[PAD]", cls_token="[CLS]", sep_token="[SEP]", mask_token="[MASK]"
-        )
-        cfg = BertConfig(vocab_size=len(tok), hidden_size=64, num_hidden_layers=2, num_attention_heads=4, intermediate_size=256)
-        return tok, *split(BertForMaskedLM(cfg))
-    path = Path(a.model)
-    if not path.exists():
-        raise FileNotFoundError(f"모델 폴더 {path} 가 없습니다. SETUP.md 를 보고 파일을 받아 이 위치에 넣어 주세요.")
-    return AutoTokenizer.from_pretrained(path, local_files_only=True), *split(AutoModelForMaskedLM.from_pretrained(path, local_files_only=True))
+    # 로컬 폴더가 있으면 그대로 쓰고, 없으면 HuggingFace Hub 에서 자동으로 내려받는다
+    return AutoTokenizer.from_pretrained(a.model), *split(AutoModelForMaskedLM.from_pretrained(a.model))
 
 
 # ============ 효율적 배치 (§3.4) ============
@@ -158,17 +138,12 @@ def main(a):
     T0 = time.time()
 
     # ---- 데이터 ----
-    if a.smoke:
-        data = smoke_data()
-        b0, b1, b2, steps = 16, 16, 4, a.steps or (300, 400, 300, 300)
-    else:
-        data = real_data(n_wiki=1500, n_lab=400, n_test=300)
-        b0, b1, b2, steps = 16, 32, 4, a.steps or (20, 50, 50, 50)
-    tok, encoder, lm_head = build(a, data)
+    data = real_data(n_wiki=1500, n_lab=400, n_test=300)
+    b0, b1, b2, steps = 16, 32, 4, a.steps or (20, 50, 50, 50)
+    tok, encoder, lm_head = build(a)
     model = M3(encoder, tok.all_special_ids, lm_head).to(dev)
     pad_id = tok.pad_token_id
-    k = 6 if a.smoke else 1  # 무작위 초기화한 작은 모델은 사전학습 모델(아래 학습률 기준)보다 학습률이 훨씬 커야 배운다
-    print(f"장치 {dev} | 모델 {'smoke(작은 BERT)' if a.smoke else a.model} 파라미터 {sum(p.numel() for p in model.parameters()) / 1e6:.0f}M")
+    print(f"장치 {dev} | 모델 {a.model} 파라미터 {sum(p.numel() for p in model.parameters()) / 1e6:.0f}M")
 
     def ids(texts, ml):
         return [torch.tensor(x) for x in tok(texts, truncation=True, max_length=ml)["input_ids"]]
@@ -194,7 +169,7 @@ def main(a):
     def step0():
         return retromae_loss(model, *pad([wiki_p[i] for i in next(s0)], pad_id, dev), tok.mask_token_id)
 
-    fit(model, "retromae", steps[0], 5e-5 * k, step0)
+    fit(model, "retromae", steps[0], 5e-5, step0)
 
     # ---- Stage 1: 비지도 대조학습 (dense 만, in-batch negative 만, 큰 배치) ----
     print("\nStage 1  비지도 대조학습 ((제목, 본문) 쌍, dense only, in-batch negative)")
@@ -206,7 +181,7 @@ def main(a):
         P = embed(model, *pad([wiki_p[i] for i in idx], pad_id, dev))
         return nce(Q.dense @ P.dense.T, torch.arange(len(idx), device=dev))  # 같은 배치의 다른 문서가 전부 negative
 
-    fit(model, "unsup", steps[1], 3e-5 * k, step1)
+    fit(model, "unsup", steps[1], 3e-5, step1)
     evaluate(model, "Stage 1 직후 (sparse/multi 헤드는 아직 학습 안 함)", test_q, test_p, pad_id, dev)
 
     # ---- hard negative 채굴 (ANCE 식: 현재 모델의 dense 검색으로 헷갈리는 문서를 찾는다) ----
@@ -237,20 +212,19 @@ def main(a):
         return loss_fn(*scores(Q, P), torch.arange(len(idx), device=dev) * G)  # 정답 위치 = i*G
 
     print("\nStage 2a 워밍업 (세 점수를 함께 학습하되 증류는 아직 안 함: 식 4)")
-    fit(model, "warmup", steps[2], 2e-5 * k, lambda: step2(loss_plain))
+    fit(model, "warmup", steps[2], 2e-5, lambda: step2(loss_plain))
     evaluate(model, "Stage 2a 직후", test_q, test_p, pad_id, dev)
 
     print(f"Stage 2b 통합 학습 ({'self-knowledge distillation: 식 4 + 식 6' if not a.no_skd else 'SKD 없음 (ablation): 식 4 계속'})")
-    fit(model, "unified", steps[3], 1e-5 * k, lambda: step2(loss_skd if not a.no_skd else loss_plain))
+    fit(model, "unified", steps[3], 1e-5, lambda: step2(loss_skd if not a.no_skd else loss_plain))
     evaluate(model, "Stage 2b 직후 (최종)", test_q, test_p, pad_id, dev)
     print(f"전체 소요 시간 {(time.time() - T0) / 60:.1f}분")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--smoke", action="store_true", help="빠른 동작 확인용: 작은 가짜 데이터와 작은 모델로 전체 단계를 돌려 본다")
     ap.add_argument("--no-skd", action="store_true", help="self-knowledge distillation 끄기")
     ap.add_argument("--device", default="auto", help="auto|cpu|cuda|mps")
-    ap.add_argument("--model", default=str(Path(__file__).parent / "models" / "xlm-roberta-base"), help="시작 모델 폴더 (논문은 xlm-roberta-large)")
+    ap.add_argument("--model", default="FacebookAI/xlm-roberta-base", help="시작 모델: HuggingFace 모델 ID 또는 로컬 폴더 (논문은 xlm-roberta-large)")
     ap.add_argument("--steps", type=int, nargs=4, metavar=("S0", "S1", "S2A", "S2B"), help="단계별 학습 step 수")
     main(ap.parse_args())
